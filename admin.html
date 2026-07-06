@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Controle - GC OBS</title>
+    <!-- Tailwind CSS para um design moderno e responsivo -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- SheetJS para ler Excel no Navegador -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Scripts Firebase no modo Compat -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    
+    <style>
+        /* Fundo quadriculado simulando transparência para o monitor do GC */
+        .fundo-transparente {
+            background-color: #ffffff;
+            background-image: linear-gradient(45deg, #e2e8f0 25%, transparent 25%), 
+                              linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #e2e8f0 75%), 
+                              linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6">
+
+    <!-- LAYOUT PRINCIPAL EM DUAS COLUNAS -->
+    <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- COLUNA DA ESQUERDA: CONTROLES E LISTA (CORRE PARA BAIXO) -->
+        <div class="lg:col-span-8 space-y-6">
+            <h1 class="text-3xl font-bold border-b border-slate-700 pb-3 text-emerald-400">Gerador de Caracteres - Admin</h1>
+
+            <!-- SEÇÃO DE CONFIGURAÇÃO E IMPORTAÇÃO -->
+            <div class="bg-slate-800 p-6 rounded-lg shadow-lg grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Planilha (.xlsx / .csv)</label>
+                    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Coluna (Ex: A)</label>
+                    <input type="text" id="inputColuna" value="A" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center font-bold uppercase">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Linhas (Início - Fim)</label>
+                    <div class="flex space-x-2">
+                        <input type="number" id="linhaInicio" value="3" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center">
+                        <input type="number" id="linhaFim" value="11" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center">
+                    </div>
+                </div>
+                <div>
+                    <button onclick="processarPlanilha()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors shadow">
+                        Importar Dados
+                    </button>
+                </div>
+            </div>
+
+            <!-- CONTROLES GERAIS DA LIVE -->
+            <div class="flex space-x-4">
+                <button onclick="ocultarGC()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded shadow transition-colors flex-1 text-lg">
+                    Limpar Tela do OBS
+                </button>
+            </div>
+
+            <!-- LISTA DE DADOS IMPORTADOS -->
+            <div class="bg-slate-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-xl font-semibold mb-4 text-slate-300">Linhas Prontas para Exibição</h2>
+                <div id="listaContainer" class="space-y-3">
+                    <p class="text-slate-500 italic">Nenhum dado importado ainda. Selecione o arquivo acima.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- COLUNA DA DIREITA: MONITOR DO OVERLAY (FIXO NO TOPO DA TELA) -->
+        <div class="lg:col-span-4 lg:sticky lg:top-6 space-y-3">
+            <h2 class="text-xl font-black uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                Monitor Retorno (Live)
+            </h2>
+            
+            <!-- Moldura do Monitor simulando a Proporção 16:9 da Transmissão -->
+            <div class="fundo-transparente border-4 border-slate-950 rounded-xl overflow-hidden shadow-2xl relative aspect-video w-full bg-white">
+                <iframe src="overlay.html" class="w-full h-full border-0 pointer-events-none select-none"></iframe>
+            </div>
+            <p class="text-xs text-slate-400 italic text-center">
+                O retorno acima exibe exatamente o que está aparecendo na transmissão do OBS.
+            </p>
+        </div>
+
+    </div>
+
+    <script>
+        // CONFIGURAÇÃO DO SEU FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCm47PASBSXgnmGgUuDkFo7u7wOJ0x5Z4",
+            authDomain: "teanpening.firebaseapp.com",
+            databaseURL: "https://teanpening-default-rtdb.firebaseio.com",
+            projectId: "teanpening",
+            storageBucket: "teanpening.firebasestorage.app",
+            messagingSenderId: "914608543394",
+            appId: "1:914608543394:web:14d560e32c24282223a9fb"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let gcAtivoChave = null;
+        let gcAtivoStatus = "oculto";
+
+        function colunaParaIndice(col) {
+            let num = 0;
+            col = col.toUpperCase();
+            for (let i = 0; i < col.length; i++) {
+                num = col.charCodeAt(i) - 64 + num * 26;
+            }
+            return num - 1;
+        }
+
+        function processarPlanilha() {
+            const fileInput = document.getElementById('fileInput');
+            const colLetra = document.getElementById('inputColuna').value;
+            const deLinha = parseInt(document.getElementById('linhaInicio').value);
+            const ateLinha = parseInt(document.getElementById('linhaFim').value);
+
+            if (!fileInput.files[0]) {
+                alert("Por favor, selecione um arquivo primeiro!");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const primeiraAba = workbook.Sheets[workbook.SheetNames[0]];
+                const matriz = XLSX.utils.sheet_to_json(primeiraAba, {header: 1});
+                const indiceColuna = colunaParaIndice(colLetra);
+
+                let dadosParaUpload = {};
+
+                for (let i = deLinha - 1; i < ateLinha; i++) {
+                    if (matriz[i] && matriz[i][indiceColuna] !== undefined) {
+                        const valor = matriz[i][indiceColuna].toString().trim();
+                        if(valor !== "") {
+                            dadosParaUpload[`linha_${i + 1}`] = {
+                                texto: valor,
+                                exibido: false,
+                                boi: ""
+                            };
+                        }
+                    }
+                }
+
+                database.ref('gc_atual').set({ texto: "", status: "oculto", chaveAtiva: "", boi: "" });
+
+                database.ref('lista_importada').remove()
+                    .then(() => {
+                        return database.ref('lista_importada').set(dadosParaUpload);
+                    })
+                    .then(() => alert("Dados antigos limpos e nova lista importada com sucesso!"))
+                    .catch(err => alert("Erro ao processar dados no Firebase: " + err));
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        database.ref('gc_atual').on('value', (snapshot) => {
+            const atual = snapshot.val();
+            if (atual) {
+                gcAtivoChave = atual.chaveAtiva || null;
+                gcAtivoStatus = atual.status || "oculto";
+            } else {
+                gcAtivoChave = null;
+                gcAtivoStatus = "oculto";
+            }
+            rederizarLista();
+        });
+
+        let dadosLocais = null;
+        database.ref('lista_importada').on('value', (snapshot) => {
+            dadosLocais = snapshot.val();
+            rederizarLista();
+        });
+
+        function rederizarLista() {
+            const container = document.getElementById('listaContainer');
+            if (!dadosLocais) {
+                container.innerHTML = `<p class="text-slate-500 italic">Nenhum dado ativo no banco.</p>`;
+                return;
+            }
+
+            container.innerHTML = "";
+
+            const chavesOrdenadas = Object.keys(dadosLocais).sort((a, b) => {
+                return parseInt(a.replace('linha_', '')) - parseInt(b.replace('linha_', ''));
+            });
+
+            chavesOrdenadas.forEach((chave) => {
+                const item = dadosLocais[chave];
+                const boiAtual = item.boi || "";
+                
+                let cardCor = item.exibido ? 'bg-emerald-950/40 border-emerald-800' : 'bg-slate-700 border-slate-600';
+                let btnCor = 'bg-emerald-600 hover:bg-emerald-500 text-white';
+                let btnTexto = 'Enviar p/ Live';
+                let labelStatus = item.exibido ? '<span class="text-emerald-400 text-xs font-bold uppercase bg-emerald-900/50 px-2 py-1 rounded">Já exibido</span>' : '';
+
+                const noAr = (gcAtivoChave === chave && gcAtivoStatus === "visivel");
+
+                if (noAr) {
+                    cardCor = 'bg-blue-950 border-blue-500 ring-2 ring-blue-500';
+                    btnCor = 'bg-red-600 hover:bg-red-500 text-white font-black animate-pulse';
+                    btnTexto = 'Ocultar da Live';
+                    labelStatus = '<span class="text-blue-400 text-xs font-bold uppercase bg-blue-900/50 px-2 py-1 rounded animate-pulse">No Ar</span>';
+                }
+
+                let botoesBoiHTML = '';
+                for (let n = 0; n <= 9; n++) {
+                    const ativo = boiAtual === n.toString();
+                    
+                    let btnClass = 'bg-slate-800 hover:bg-slate-600 text-slate-300';
+                    if (ativo) {
+                        btnClass = noAr 
+                            ? 'bg-red-600 text-white font-black scale-110 shadow-md ring-2 ring-red-400' 
+                            : 'bg-amber-500 text-slate-950 font-black';
+                    }
+
+                    botoesBoiHTML += `<button onclick="selecionarBoi('${chave}', '${n}')" class="w-8 h-8 text-sm rounded font-bold transition-all ${btnClass}">${n}</button>`;
+                }
+                
+                const btnLimparBoiClass = boiAtual === "" ? 'bg-slate-800 text-slate-500 line-through' : 'bg-red-950 text-red-400 border border-red-900';
+                botoesBoiHTML += `<button onclick="selecionarBoi('${chave}', '')" class="px-2 h-8 text-xs rounded font-medium transition-all ${btnLimparBoiClass}">Limpar</button>`;
+
+                const div = document.createElement('div');
+                div.className = `p-4 border rounded-lg flex flex-col gap-3 transition-all duration-300 ${cardCor}`;
+                
+                div.innerHTML = `
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div class="flex-1 space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-slate-400 font-mono">${chave.toUpperCase()}</span>
+                                ${labelStatus}
+                            </div>
+                            <input type="text" id="input-${chave}" value="${item.texto}" class="w-full bg-slate-800 text-white border border-transparent focus:border-blue-500 rounded px-2 py-1 text-lg font-semibold">
+                        </div>
+                        <div class="flex gap-2 items-center self-end md:self-center">
+                            <button onclick="salvarEdicao('${chave}')" class="bg-amber-600 hover:bg-amber-700 text-white font-medium text-sm px-3 py-2 rounded transition-colors h-11">
+                                Salvar
+                            </button>
+                            <button onclick="toggleLive('${chave}')" class="${btnCor} font-bold text-sm px-5 rounded transition-colors shadow h-11 min-w-[130px]">
+                                ${btnTexto}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-800">
+                        <span class="text-xs font-semibold text-slate-400 mr-2">Número do Boi:</span>
+                        ${botoesBoiHTML}
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function selecionarBoi(chave, numero) {
+            database.ref(`lista_importada/${chave}`).update({ boi: numero }).then(() => {
+                if (gcAtivoChave === chave && gcAtivoStatus === "visivel") {
+                    database.ref('gc_atual').update({ boi: numero });
+                }
+            });
+        }
+
+        function salvarEdicao(chave) {
+            const novoTexto = document.getElementById(`input-${chave}`).value;
+            database.ref(`lista_importada/${chave}`).update({ texto: novoTexto })
+                .then(() => alert("Texto atualizado com sucesso!"));
+        }
+
+        function toggleLive(chave) {
+            const textoAtual = document.getElementById(`input-${chave}`).value;
+            const boiAtual = dadosLocais[chave].boi || "";
+
+            if (gcAtivoChave === chave && gcAtivoStatus === "visivel") {
+                ocultarGC();
+            } else {
+                database.ref('gc_atual').set({
+                    texto: textoAtual,
+                    status: "visivel",
+                    chaveAtiva: chave,
+                    boi: boiAtual
+                });
+                database.ref(`lista_importada/${chave}`).update({ exibido: true });
+            }
+        }
+
+        function ocultarGC() {
+            database.ref('gc_atual').update({ status: "oculto" });
+        }
+    </script>
+</body>
+</html>

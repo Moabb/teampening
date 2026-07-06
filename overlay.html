@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Overlay GC - OBS Studio</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    
+    <style>
+        .gc-wrapper {
+            overflow: hidden;
+            height: 120px;
+            display: flex;
+            align-items: center;
+        }
+
+        .gc-container {
+            opacity: 0;
+            transform: translateX(-100%);
+            transition: transform 0.6s cubic-bezier(0.075, 0.82, 0.165, 1), opacity 0.4s ease;
+        }
+
+        .gc-container.visivel {
+            opacity: 1;
+            transform: translateX(0%);
+        }
+
+        /* Efeito de transição suave específico para a aparição do Boi em tempo real */
+        .boi-box-transicao {
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-width: 0px;
+            padding-left: 0px;
+            padding-right: 0px;
+            opacity: 0;
+            overflow: hidden;
+        }
+
+        .boi-box-transicao.ativo {
+            max-width: 120px;
+            padding-left: 1.25rem;
+            padding-right: 1.25rem;
+            opacity: 1;
+        }
+
+        @keyframes shine {
+            0% { border-left-color: #10b981; }
+            50% { border-left-color: #34d399; filter: drop-shadow(0 0 10px #10b981); }
+            100% { border-left-color: #10b981; }
+        }
+
+        .animar-borda {
+            animation: shine 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-transparent overflow-hidden w-full h-full min-h-screen relative font-sans">
+
+    <!-- POSICIONAMENTO DO GC (Canto esquerdo inferior) -->
+    <div class="absolute bottom-16 left-12 px-4 gc-wrapper">
+        
+        <!-- CARD PRINCIPAL DO GC -->
+        <div id="gcBox" class="gc-container bg-slate-950/95 border-l-8 border-emerald-500 shadow-2xl rounded-r-2xl flex items-stretch min-w-[] max-w-4xl border border-slate-800/80 animar-borda overflow-hidden">
+            
+            <!-- Bloco do Número do Boi com animação de largura para abrir dinamicamente -->
+            <div id="boiBox" class="boi-box-transicao bg-amber-500 text-slate-950 flex flex-col justify-center items-center font-black border-r border-slate-900/20">
+                <span class="text-[10px] uppercase tracking-wider font-extrabold opacity-80 leading-none mb-1">Boi</span>
+                <span id="boiNumero" class="text-4xl leading-none font-black">--</span>
+            </div>
+
+            <!-- Bloco dos Nomes do Trio -->
+            <div class="space-y-0.5 px-8 py-4 flex flex-col justify-center text-left flex-1">
+                <span class="text-xs uppercase tracking-[0.2em] font-black text-emerald-400 block text-left">Em Pista</span>
+                <h2 id="gcTexto" class="text-3xl font-extrabold text-slate-100 uppercase tracking-wide truncate text-left drop-shadow-md">
+                    Carregando...
+                </h2>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // CONFIGURAÇÃO DO SEU FIREBASE
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCm47PASBSXgnmGgUuDkFo7u7wOJ0x5Z4",
+            authDomain: "teanpening.firebaseapp.com",
+            databaseURL: "https://teanpening-default-rtdb.firebaseio.com",
+            projectId: "teanpening",
+            storageBucket: "teanpening.firebasestorage.app",
+            messagingSenderId: "914608543394",
+            appId: "1:914608543394:web:14d560e32c24282223a9fb"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const gcBox = document.getElementById('gcBox');
+        const gcTexto = document.getElementById('gcTexto');
+        const boiBox = document.getElementById('boiBox');
+        const boiNumero = document.getElementById('boiNumero');
+
+        database.ref('gc_atual').on('value', (snapshot) => {
+            const dados = snapshot.val();
+
+            if (dados) {
+                if (dados.status === "visivel" && dados.texto) {
+                    gcTexto.innerText = dados.texto;
+                    
+                    // Se houver um número de boi ativo, adiciona o layout animado
+                    if (dados.boi !== undefined && dados.boi !== "") {
+                        boiNumero.innerText = dados.boi;
+                        boiBox.classList.add('ativo');
+                    } else {
+                        // Se não tiver boi sorteado ainda, o box do boi fica recolhido sem quebrar o layout
+                        boiBox.classList.remove('ativo');
+                    }
+
+                    gcBox.classList.add('visivel');
+                } else {
+                    gcBox.classList.remove('visivel');
+                    boiBox.classList.remove('ativo');
+                }
+            } else {
+                gcBox.classList.remove('visivel');
+                boiBox.classList.remove('ativo');
+            }
+        });
+    </script>
+</body>
+</html>
