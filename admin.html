@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel de Controle - GC OBS</title>
-    <!-- Tailwind CSS para um design moderno e responsivo -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- SheetJS para ler Excel no Navegador -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <!-- Scripts Firebase no modo Compat -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     
@@ -23,49 +20,81 @@
             background-size: 20px 20px;
             background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }
+
+        /* CONTAINER DO MONITOR: Garante o espaço correto de uma tela 16:9 */
+        .monitor-container {
+            position: relative;
+            width: 100%;
+            height: 0;
+            padding-bottom: 56.25%; /* Proporção 16:9 perfeita */
+            overflow: hidden;
+            background: transparent;
+        }
+
+        /* IFRAME COM ESCALA FIXA E SEGURA */
+        .monitor-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1920px;
+            height: 1080px;
+            transform-origin: top left;
+            transform: scale(0.24); /* Fator de redução fixo e seguro para o painel lateral */
+            border: 0;
+            max-width: none;
+        }
+
+        /* Ajuste fino para telas muito grandes se adaptarem sem quebrar */
+        @media (min-width: 1400px) {
+            .monitor-container iframe {
+                transform: scale(0.26);
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-6">
 
-    <!-- LAYOUT PRINCIPAL EM DUAS COLUNAS -->
     <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        <!-- COLUNA DA ESQUERDA: CONTROLES E LISTA (CORRE PARA BAIXO) -->
         <div class="lg:col-span-8 space-y-6">
             <h1 class="text-3xl font-bold border-b border-slate-700 pb-3 text-emerald-400">Gerador de Caracteres - Admin</h1>
 
-            <!-- SEÇÃO DE CONFIGURAÇÃO E IMPORTAÇÃO -->
-            <div class="bg-slate-800 p-6 rounded-lg shadow-lg grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                <div>
+            <div class="bg-slate-800 p-6 rounded-lg shadow-lg grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                <div class="md:col-span-2">
                     <label class="block text-sm font-medium mb-1">Planilha (.xlsx / .csv)</label>
                     <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer">
                 </div>
+                
                 <div>
-                    <label class="block text-sm font-medium mb-1">Coluna (Ex: A)</label>
-                    <input type="text" id="inputColuna" value="A" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center font-bold uppercase">
+                    <label class="block text-sm font-medium mb-1">Colunas do Trio</label>
+                    <div class="flex space-x-1">
+                        <input type="text" id="inputColuna1" value="A" placeholder="1º" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center font-bold uppercase text-sm">
+                        <input type="text" id="inputColuna2" value="B" placeholder="2º" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center font-bold uppercase text-sm">
+                        <input type="text" id="inputColuna3" value="C" placeholder="3º" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center font-bold uppercase text-sm">
+                    </div>
                 </div>
+
                 <div>
                     <label class="block text-sm font-medium mb-1">Linhas (Início - Fim)</label>
                     <div class="flex space-x-2">
-                        <input type="number" id="linhaInicio" value="3" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center">
+                        <input type="number" id="linhaInicio" value="4" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center">
                         <input type="number" id="linhaFim" value="11" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center">
                     </div>
                 </div>
+                
                 <div>
-                    <button onclick="processarPlanilha()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors shadow">
+                    <button onclick="processarPlanilha()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-colors shadow h-10">
                         Importar Dados
                     </button>
                 </div>
             </div>
 
-            <!-- CONTROLES GERAIS DA LIVE -->
             <div class="flex space-x-4">
                 <button onclick="ocultarGC()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded shadow transition-colors flex-1 text-lg">
                     Limpar Tela do OBS
                 </button>
             </div>
 
-            <!-- LISTA DE DADOS IMPORTADOS -->
             <div class="bg-slate-800 p-6 rounded-lg shadow-lg">
                 <h2 class="text-xl font-semibold mb-4 text-slate-300">Linhas Prontas para Exibição</h2>
                 <div id="listaContainer" class="space-y-3">
@@ -74,16 +103,16 @@
             </div>
         </div>
 
-        <!-- COLUNA DA DIREITA: MONITOR DO OVERLAY (FIXO NO TOPO DA TELA) -->
         <div class="lg:col-span-4 lg:sticky lg:top-6 space-y-3">
             <h2 class="text-xl font-black uppercase tracking-wider text-emerald-400 flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
                 Monitor Retorno (Live)
             </h2>
             
-            <!-- Moldura do Monitor simulando a Proporção 16:9 da Transmissão -->
-            <div class="fundo-transparente border-4 border-slate-950 rounded-xl overflow-hidden shadow-2xl relative aspect-video w-full bg-white">
-                <iframe src="overlay.html" class="w-full h-full border-0 pointer-events-none select-none"></iframe>
+            <div class="fundo-transparente border-4 border-slate-950 rounded-xl shadow-2xl overflow-hidden">
+                <div class="monitor-container">
+                    <iframe src="overlay.html" class="pointer-events-none select-none"></iframe>
+                </div>
             </div>
             <p class="text-xs text-slate-400 italic text-center">
                 O retorno acima exibe exatamente o que está aparecendo na transmissão do OBS.
@@ -112,7 +141,8 @@
 
         function colunaParaIndice(col) {
             let num = 0;
-            col = col.toUpperCase();
+            col = col.toUpperCase().trim();
+            if (!col) return -1;
             for (let i = 0; i < col.length; i++) {
                 num = col.charCodeAt(i) - 64 + num * 26;
             }
@@ -121,7 +151,9 @@
 
         function processarPlanilha() {
             const fileInput = document.getElementById('fileInput');
-            const colLetra = document.getElementById('inputColuna').value;
+            const colLetra1 = document.getElementById('inputColuna1').value;
+            const colLetra2 = document.getElementById('inputColuna2').value;
+            const colLetra3 = document.getElementById('inputColuna3').value;
             const deLinha = parseInt(document.getElementById('linhaInicio').value);
             const ateLinha = parseInt(document.getElementById('linhaFim').value);
 
@@ -138,16 +170,33 @@
                 const workbook = XLSX.read(data, {type: 'array'});
                 const primeiraAba = workbook.Sheets[workbook.SheetNames[0]];
                 const matriz = XLSX.utils.sheet_to_json(primeiraAba, {header: 1});
-                const indiceColuna = colunaParaIndice(colLetra);
+                
+                // Converte as 3 colunas informadas para índices numéricos
+                const idxCol1 = colunaParaIndice(colLetra1);
+                const idxCol2 = colunaParaIndice(colLetra2);
+                const idxCol3 = colunaParaIndice(colLetra3);
 
                 let dadosParaUpload = {};
 
                 for (let i = deLinha - 1; i < ateLinha; i++) {
-                    if (matriz[i] && matriz[i][indiceColuna] !== undefined) {
-                        const valor = matriz[i][indiceColuna].toString().trim();
-                        if(valor !== "") {
+                    if (matriz[i]) {
+                        let nomesTrio = [];
+                        
+                        // Captura e limpa o valor de cada uma das colunas se existirem
+                        if (idxCol1 !== -1 && matriz[i][idxCol1] !== undefined) nomesTrio.push(matriz[i][idxCol1].toString().trim());
+                        if (idxCol2 !== -1 && matriz[i][idxCol2] !== undefined) nomesTrio.push(matriz[i][idxCol2].toString().trim());
+                        if (idxCol3 !== -1 && matriz[i][idxCol3] !== undefined) nomesTrio.push(matriz[i][idxCol3].toString().trim());
+                        
+                        // Filtra para remover qualquer valor em branco eventual
+                        nomesTrio = nomesTrio.filter(n => n !== "");
+
+                        // Só adiciona a linha se pelo menos um nome foi encontrado nas colunas
+                        if (nomesTrio.length > 0) {
+                            // Junta os nomes encontrados usando vírgula e espaço: "JOÃO, JOSE, GERALDO"
+                            const linhaTextoCompleto = nomesTrio.join(", ");
+                            
                             dadosParaUpload[`linha_${i + 1}`] = {
-                                texto: valor,
+                                texto: linhaTextoCompleto,
                                 exibido: false,
                                 boi: ""
                             };
@@ -161,7 +210,7 @@
                     .then(() => {
                         return database.ref('lista_importada').set(dadosParaUpload);
                     })
-                    .then(() => alert("Dados antigos limpos e nova lista importada com sucesso!"))
+                    .then(() => alert("Dados antigos limpos e nova lista importada combinando as 3 colunas!"))
                     .catch(err => alert("Erro ao processar dados no Firebase: " + err));
             };
 
