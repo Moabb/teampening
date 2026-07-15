@@ -94,8 +94,35 @@
                 </div>
                 
                 <div>
-                    <button onclick="processarPlanilha()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded transition-colors shadow h-10">
-                        Importar Dados
+                    <button onclick="processarPlanilha()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded transition-colors shadow h-10">Importar</button>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-lg font-bold text-slate-300 mb-3 uppercase tracking-wider">Registrar & Alternar Lotes / Listas</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div class="md:col-span-1">
+                        <label class="block text-sm font-medium mb-1 text-slate-400">Nome do Novo Lote</label>
+                        <input type="text" id="inputNomeLista" placeholder="Ex: Sexta Pro, Sábado Aspirante..." class="w-full bg-slate-700 border border-slate-600 rounded p-2.5 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 font-bold">
+                    </div>
+                    <div class="md:col-span-1">
+                        <label class="block text-sm font-medium mb-1 text-slate-400">Lotes Gravados no Firebase</label>
+                        <select id="selectListasRegistradas" class="w-full bg-slate-700 border border-slate-600 rounded p-2.5 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 font-bold">
+                            <option value="">Carregando listas...</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-1">
+                        <button onclick="carregarListaSelecionada()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded transition-colors shadow text-xs uppercase h-10">
+                            Ativar Lote Selecionado
+                        </button>
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-4">
+                    <button onclick="salvarListaAtualComo()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded transition-colors shadow text-xs uppercase">
+                        Salvar Lista Ativa Como Lote
+                    </button>
+                    <button onclick="excluirListaSelecionada()" class="bg-red-700 hover:bg-red-800 text-white font-bold py-2.5 px-4 rounded transition-colors shadow text-xs uppercase">
+                        Excluir Lote Gravado
                     </button>
                 </div>
             </div>
@@ -341,12 +368,33 @@
 
                 database.ref('gc_atual_2').set({ texto: "", status: "oculto", chaveAtiva: "", boi: "", categoria: "", tempo: "" });
 
-                database.ref('lista_importada_2').remove()
+                // Detecta se há um nome de lote preenchido ou se precisa perguntar
+                let nomeLista = document.getElementById('inputNomeLista').value.trim();
+                if (!nomeLista) {
+                    nomeLista = prompt("Deseja registrar esta nova lista com qual nome no Firebase?");
+                    if (nomeLista) {
+                        nomeLista = nomeLista.trim();
+                        document.getElementById('inputNomeLista').value = nomeLista;
+                    }
+                }
+
+                const promiseSalvarAtiva = database.ref('lista_importada_2').remove()
                     .then(() => {
                         return database.ref('lista_importada_2').set(dadosParaUpload);
-                    })
-                    .then(() => alert("Dados importados com sucesso!"))
-                    .catch(err => alert("Erro ao processar dados: " + err));
+                    });
+
+                if (nomeLista) {
+                    promiseSalvarAtiva
+                        .then(() => {
+                            return database.ref(`listas_registradas/${nomeLista}`).set(dadosParaUpload);
+                        })
+                        .then(() => alert(`Lista importada, registrada como "${nomeLista}" e ativada na live!`))
+                        .catch(err => alert("Erro ao processar e registrar: " + err));
+                } else {
+                    promiseSalvarAtiva
+                        .then(() => alert("Lista importada e ativada temporariamente (não foi salva nos Lotes)!"))
+                        .catch(err => alert("Erro ao processar dados: " + err));
+                }
             };
 
             reader.readAsArrayBuffer(file);
@@ -369,6 +417,80 @@
             rederizarLista();
             rederizarRankingPreview();
         });
+
+        // OUVINTE PARA CARREGAR AS LISTAS REGISTRADAS NO SELECT DINAMICAMENTE
+        database.ref('listas_registradas').on('value', (snapshot) => {
+            const listas = snapshot.val();
+            const select = document.getElementById('selectListasRegistradas');
+            select.innerHTML = '<option value="">-- Selecione um lote --</option>';
+            if (listas) {
+                Object.keys(listas).forEach(nome => {
+                    const opt = document.createElement('option');
+                    opt.value = nome;
+                    opt.textContent = nome;
+                    select.appendChild(opt);
+                });
+            }
+        });
+
+        function salvarListaAtualComo() {
+            const nomeLista = document.getElementById('inputNomeLista').value.trim();
+            if (!nomeLista) {
+                alert("Por favor, digite um nome no campo 'Nome do Novo Lote' para registrar!");
+                return;
+            }
+            if (!dadosLocais) {
+                alert("Não há dados ativos carregados para salvar neste lote!");
+                return;
+            }
+            database.ref(`listas_registradas/${nomeLista}`).set(dadosLocais)
+                .then(() => alert(`Lote "${nomeLista}" salvo e registrado com sucesso!`))
+                .catch(err => alert("Erro ao salvar lote: " + err));
+        }
+
+        function carregarListaSelecionada() {
+            const select = document.getElementById('selectListasRegistradas');
+            const nomeLista = select.value;
+            if (!nomeLista) {
+                alert("Por favor, selecione um Lote Registrado para carregar!");
+                return;
+            }
+
+            if (confirm(`Deseja carregar o lote "${nomeLista}" na Live? Isso substituirá a lista ativa atual.`)) {
+                // Oculta qualquer GC ativo para evitar travamentos ou incompatibilidades visuais temporárias
+                database.ref('gc_atual_2').set({ texto: "", status: "oculto", chaveAtiva: "", boi: "", categoria: "", tempo: "" });
+
+                database.ref(`listas_registradas/${nomeLista}`).once('value')
+                    .then((snapshot) => {
+                        const dados = snapshot.val();
+                        if (dados) {
+                            return database.ref('lista_importada_2').set(dados);
+                        } else {
+                            throw new Error("Dados do lote estão vazios ou não encontrados.");
+                        }
+                    })
+                    .then(() => {
+                        document.getElementById('inputNomeLista').value = nomeLista;
+                        alert(`Lote "${nomeLista}" ativo na live!`);
+                    })
+                    .catch(err => alert("Erro ao carregar lote: " + err));
+            }
+        }
+
+        function excluirListaSelecionada() {
+            const select = document.getElementById('selectListasRegistradas');
+            const nomeLista = select.value;
+            if (!nomeLista) {
+                alert("Selecione um lote na lista para excluir!");
+                return;
+            }
+
+            if (confirm(`Tem certeza absoluta de que deseja EXCLUIR permanentemente o lote "${nomeLista}" do Firebase?`)) {
+                database.ref(`listas_registradas/${nomeLista}`).remove()
+                    .then(() => alert(`Lote "${nomeLista}" excluído com sucesso!`))
+                    .catch(err => alert("Erro ao excluir lote: " + err));
+            }
+        }
 
         function rederizarLista() {
             const container = document.getElementById('listaContainer');
