@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Classificação Oficial Top 10 - Final</title>
-    <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     
@@ -308,7 +307,7 @@
         
         <div class="cabecalho-placar">
             <div>
-                <h1 class="titulo-principal">FINAL</h1>
+                <h1 id="tituloPagina" class="titulo-principal">CLASSIFICAÇÃO FINAL</h1>
                 <p class="subtitulo">
                     <span class="subtitulo-indicador"></span>
                     RANKING TOP 10 • MENORES TEMPOS
@@ -357,6 +356,17 @@
 
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
+
+        // Escuta a alteração dinâmica do TÍTULO da Final
+        database.ref('titulo_final').on('value', (snapshot) => {
+            const titulo = snapshot.val();
+            const elTitulo = document.getElementById('tituloPagina');
+            if (titulo && titulo.trim() !== "") {
+                elTitulo.innerText = titulo;
+            } else {
+                elTitulo.innerText = "CLASSIFICAÇÃO FINAL";
+            }
+        });
 
         // Escuta o comando de visibilidade da Final
         database.ref('visibilidade_final').on('value', (snapshot) => {

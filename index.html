@@ -55,7 +55,6 @@
         <div class="lg:col-span-8 space-y-6">
             <h1 class="text-3xl font-bold border-b border-slate-700 pb-3 text-cyan-400">Cronometragem & Classificação - Admin Geral</h1>
 
-            <!-- NOVO: Gerenciamento da URL da Logo do Evento -->
             <div class="bg-slate-800 p-6 rounded-lg shadow-lg">
                 <h2 class="text-lg font-bold text-slate-300 mb-3 uppercase tracking-wider">Logo do Evento</h2>
                 <div class="flex gap-3">
@@ -123,7 +122,6 @@
                     Monitor Retorno (Live 2)
                 </h2>
 
-                <!-- NOVO: Botões para exibir/ocultar Semifinal e Final -->
                 <div class="grid grid-cols-2 gap-2">
                     <button id="btnToggleSemi" onclick="toggleSemi()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-3 rounded text-xs transition-colors shadow uppercase">
                         Carregando...
@@ -131,6 +129,21 @@
                     <button id="btnToggleFinal" onclick="toggleFinal()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-3 rounded text-xs transition-colors shadow uppercase">
                         Carregando...
                     </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="space-y-1">
+                        <input type="text" id="inputTituloSemi" placeholder="Título Semifinal" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500">
+                        <button onclick="salvarTituloSemi()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-2 rounded text-[10px] transition-colors shadow uppercase">
+                            Salvar Título Semi
+                        </button>
+                    </div>
+                    <div class="space-y-1">
+                        <input type="text" id="inputTituloFinal" placeholder="Título Final" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500">
+                        <button onclick="salvarTituloFinal()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-2 rounded text-[10px] transition-colors shadow uppercase">
+                            Salvar Título Final
+                        </button>
+                    </div>
                 </div>
 
                 <div class="fundo-transparente border-4 border-slate-950 rounded-xl shadow-2xl overflow-hidden">
@@ -195,8 +208,33 @@
         function salvarLogoUrl() {
             const novaUrl = document.getElementById('inputLogoUrl').value.trim();
             database.ref('logo_evento_url').set(novaUrl)
-                .then(() => alert("URL da Logo atualizada com sucesso!"))
+                .then(() => alert("URL da Logo updated com sucesso!"))
                 .catch(err => alert("Erro ao salvar URL: " + err));
+        }
+
+        // Monitoramento dos Títulos de Semifinal e Final
+        database.ref('titulo_semifinal').on('value', (snapshot) => {
+            const titulo = snapshot.val() || "";
+            document.getElementById('inputTituloSemi').value = titulo;
+        });
+
+        database.ref('titulo_final').on('value', (snapshot) => {
+            const titulo = snapshot.val() || "";
+            document.getElementById('inputTituloFinal').value = titulo;
+        });
+
+        function salvarTituloSemi() {
+            const novoTitulo = document.getElementById('inputTituloSemi').value.trim();
+            database.ref('titulo_semifinal').set(novoTitulo)
+                .then(() => alert("Título da Semifinal atualizado com sucesso!"))
+                .catch(err => alert("Erro ao salvar título: " + err));
+        }
+
+        function salvarTituloFinal() {
+            const novoTitulo = document.getElementById('inputTituloFinal').value.trim();
+            database.ref('titulo_final').set(novoTitulo)
+                .then(() => alert("Título da Final atualizado com sucesso!"))
+                .catch(err => alert("Erro ao salvar título: " + err));
         }
 
         // Monitoramento de visibilidade das páginas
