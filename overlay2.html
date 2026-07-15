@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Overlay GC - OBS Studio</title>
+    <title>Overlay GC 2 (Pista e Tempos) - OBS Studio</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
@@ -27,7 +27,6 @@
             transform: translateX(0%);
         }
 
-        /* Efeito de transição suave específico para a aparição da Categoria em tempo real */
         .categoria-box-transicao {
             transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             max-width: 0px;
@@ -39,13 +38,12 @@
         }
 
         .categoria-box-transicao.ativa {
-            max-width: 250px; /* Largura limite segura para categorias compridas */
+            max-width: 250px;
             padding-left: 1.25rem;
             padding-right: 1.25rem;
             opacity: 1;
         }
 
-        /* Efeito de transição suave específico para a aparição do Boi em tempo real */
         .boi-box-transicao {
             transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             max-width: 0px;
@@ -62,10 +60,27 @@
             opacity: 1;
         }
 
+        /* Transição Suave para a aba do tempo registrado */
+        .tempo-box-transicao {
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-width: 0px;
+            padding-left: 0px;
+            padding-right: 0px;
+            opacity: 0;
+            overflow: hidden;
+        }
+
+        .tempo-box-transicao.ativo {
+            max-width: 200px;
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
+            opacity: 1;
+        }
+
         @keyframes shine {
-            0% { border-left-color: #10b981; }
-            50% { border-left-color: #34d399; filter: drop-shadow(0 0 10px #10b981); }
-            100% { border-left-color: #10b981; }
+            0% { border-left-color: #06b6d4; }
+            50% { border-left-color: #22d3ee; filter: drop-shadow(0 0 10px #06b6d4); }
+            100% { border-left-color: #06b6d4; }
         }
 
         .animar-borda {
@@ -77,23 +92,28 @@
 
     <div class="absolute bottom-16 left-12 px-4 gc-wrapper">
         
-        <div id="gcBox" class="gc-container bg-slate-950/95 border-l-8 border-emerald-500 shadow-2xl rounded-r-2xl flex items-stretch min-w-[] max-w-5xl border border-slate-800/80 animar-borda overflow-hidden">
+        <div id="gcBox" class="gc-container bg-slate-950/95 border-l-8 border-cyan-500 shadow-2xl rounded-r-2xl flex items-stretch min-w-[] max-w-6xl border border-slate-800/80 animar-borda overflow-hidden">
             
-            <div id="categoriaBox" class="categoria-box-transicao bg-emerald-600 text-slate-100 flex flex-col justify-center items-center font-extrabold border-r border-slate-900/40">
-                <span class="text-[10px] uppercase tracking-[0.15em] font-black text-emerald-100 opacity-90 leading-none mb-1">Categoria</span>
+            <div id="categoriaBox" class="categoria-box-transicao bg-cyan-600 text-slate-100 flex flex-col justify-center items-center font-extrabold border-r border-slate-900/40">
+                <span class="text-[10px] uppercase tracking-[0.15em] font-black text-cyan-100 opacity-90 leading-none mb-1">Categoria</span>
                 <span id="categoriaNome" class="text-xl font-black uppercase tracking-wider">--</span>
             </div>
 
-            <div id="boiBox" class="boi-box-transicao bg-amber-500 text-slate-950 flex flex-col justify-center items-center font-black border-r border-slate-900/20">
-                <span class="text-[14px] uppercase tracking-wider font-extrabold opacity-80 leading-none mb-1">Boi</span>
-                <span id="boiNumero" class="text-4xl leading-none font-black">--</span>
+            <div id="boiBox" class="boi-box-transicao bg-slate-800 text-cyan-400 flex flex-col justify-center items-center font-black border-r border-slate-900/20">
+                <span class="text-[12px] uppercase tracking-wider font-extrabold opacity-80 leading-none mb-1">Boi</span>
+                <span id="boiNumero" class="text-4xl leading-none font-black text-amber-500">--</span>
             </div>
 
             <div class="space-y-0.5 px-8 py-4 flex flex-col justify-center text-left flex-1 min-w-[350px]">
-                <span class="text-x uppercase tracking-[0.2em] font-black text-emerald-400 block text-left">Em Pista</span>
+                <span class="text-x uppercase tracking-[0.2em] font-black text-cyan-400 block text-left">Em Pista</span>
                 <h2 id="gcTexto" class="text-3xl font-extrabold text-slate-100 uppercase tracking-wide truncate text-left drop-shadow-md">
                     Carregando...
                 </h2>
+            </div>
+
+            <div id="tempoBox" class="tempo-box-transicao bg-emerald-600 text-white flex flex-col justify-center items-center font-black">
+                <span class="text-[10px] uppercase tracking-widest opacity-90 leading-none mb-1">Tempo oficial</span>
+                <span id="tempoValor" class="text-3xl leading-none font-mono font-black text-amber-300">--</span>
             </div>
         </div>
 
@@ -116,22 +136,20 @@
 
         const gcBox = document.getElementById('gcBox');
         const gcTexto = document.getElementById('gcTexto');
-        
         const categoriaBox = document.getElementById('categoriaBox');
         const categoriaNome = document.getElementById('categoriaNome');
-        
         const boiBox = document.getElementById('boiBox');
         const boiNumero = document.getElementById('boiNumero');
+        const tempoBox = document.getElementById('tempoBox');
+        const tempoValor = document.getElementById('tempoValor');
 
-        database.ref('gc_atual').on('value', (snapshot) => {
+        database.ref('gc_atual_2').on('value', (snapshot) => {
             const dados = snapshot.val();
 
             if (dados) {
                 if (dados.status === "visivel" && dados.texto) {
-                    // Atualiza o texto dos competidores
                     gcTexto.innerText = dados.texto;
                     
-                    // Sincroniza a Categoria ativa
                     if (dados.categoria !== undefined && dados.categoria !== "") {
                         categoriaNome.innerText = dados.categoria;
                         categoriaBox.classList.add('ativa');
@@ -139,7 +157,6 @@
                         categoriaBox.classList.remove('ativa');
                     }
                     
-                    // Se houver um número de boi ativo, adiciona o layout animado
                     if (dados.boi !== undefined && dados.boi !== "") {
                         boiNumero.innerText = dados.boi;
                         boiBox.classList.add('ativo');
@@ -147,16 +164,26 @@
                         boiBox.classList.remove('ativo');
                     }
 
+                    // Se o tempo tiver sido registrado, exibe a aba de tempo
+                    if (dados.tempo !== undefined && dados.tempo !== "") {
+                        tempoValor.innerText = dados.tempo + "s";
+                        tempoBox.classList.add('ativo');
+                    } else {
+                        tempoBox.classList.remove('ativo');
+                    }
+
                     gcBox.classList.add('visivel');
                 } else {
                     gcBox.classList.remove('visivel');
                     categoriaBox.classList.remove('ativa');
                     boiBox.classList.remove('ativo');
+                    tempoBox.classList.remove('ativo');
                 }
             } else {
                 gcBox.classList.remove('visivel');
                 categoriaBox.classList.remove('ativa');
                 boiBox.classList.remove('ativo');
+                tempoBox.classList.remove('ativo');
             }
         });
     </script>

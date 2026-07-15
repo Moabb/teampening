@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Controle (Tempos) - GC OBS</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    
+    <style>
+        .fundo-transparente {
+            background-color: #ffffff;
+            background-image: linear-gradient(45deg, #e2e8f0 25%, transparent 25%), 
+                              linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #e2e8f0 75%), 
+                              linear-gradient(-45deg, transparent 75%, #e2e8f0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        .monitor-container {
+            position: relative;
+            width: 100%;
+            height: 0;
+            padding-bottom: 56.25%;
+            overflow: hidden;
+            background: transparent;
+        }
+
+        .monitor-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1920px;
+            height: 1080px;
+            transform-origin: top left;
+            transform: scale(0.24);
+            border: 0;
+            max-width: none;
+        }
+
+        @media (min-width: 1400px) {
+            .monitor-container iframe {
+                transform: scale(0.26);
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-6">
+
+    <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <div class="lg:col-span-8 space-y-6">
+            <h1 class="text-3xl font-bold border-b border-slate-700 pb-3 text-cyan-400">Cronometragem & Classificação - Admin Geral</h1>
+
+            <!-- NOVO: Gerenciamento da URL da Logo do Evento -->
+            <div class="bg-slate-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-lg font-bold text-slate-300 mb-3 uppercase tracking-wider">Logo do Evento</h2>
+                <div class="flex gap-3">
+                    <input type="text" id="inputLogoUrl" placeholder="Cole aqui a URL da imagem (PNG transparente de preferência)" class="flex-1 bg-slate-700 border border-slate-600 rounded p-2.5 text-sm text-slate-100 focus:outline-none focus:border-cyan-500">
+                    <button onclick="salvarLogoUrl()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded transition-colors shadow">
+                        Salvar Logo
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 p-6 rounded-lg shadow-lg grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium mb-1">Planilha (.xlsx / .csv)</label>
+                    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1">Colunas do Trio</label>
+                    <div class="flex space-x-1">
+                        <input type="text" id="inputColuna1" value="A" placeholder="1º" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center font-bold uppercase text-sm">
+                        <input type="text" id="inputColuna2" value="B" placeholder="2º" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center font-bold uppercase text-sm">
+                        <input type="text" id="inputColuna3" value="C" placeholder="3º" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center font-bold uppercase text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Coluna Cat.</label>
+                    <input type="text" id="inputColunaCategoria" value="D" placeholder="Cat" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center font-bold uppercase text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Linhas (Início - Fim)</label>
+                    <div class="flex space-x-2">
+                        <input type="number" id="linhaInicio" value="4" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center">
+                        <input type="number" id="linhaFim" value="11" class="w-full bg-slate-700 border border-slate-600 rounded p-2 text-center">
+                    </div>
+                </div>
+                
+                <div>
+                    <button onclick="processarPlanilha()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded transition-colors shadow h-10">
+                        Importar Dados
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex space-x-4">
+                <button onclick="ocultarGC()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded shadow transition-colors flex-1 text-lg">
+                    Limpar Tela do OBS (GC 2)
+                </button>
+            </div>
+
+            <div class="bg-slate-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-xl font-semibold mb-4 text-slate-300">Inscrições e Tempos Cadastrados</h2>
+                <div id="listaContainer" class="space-y-3">
+                    <p class="text-slate-500 italic">Nenhum dado importado ainda. Selecione o arquivo acima.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="lg:col-span-4 lg:sticky lg:top-6 space-y-6">
+            
+            <div class="space-y-3">
+                <h2 class="text-xl font-black uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                    Monitor Retorno (Live 2)
+                </h2>
+
+                <!-- NOVO: Botões para exibir/ocultar Semifinal e Final -->
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btnToggleSemi" onclick="toggleSemi()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-3 rounded text-xs transition-colors shadow uppercase">
+                        Carregando...
+                    </button>
+                    <button id="btnToggleFinal" onclick="toggleFinal()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold py-2 px-3 rounded text-xs transition-colors shadow uppercase">
+                        Carregando...
+                    </button>
+                </div>
+
+                <div class="fundo-transparente border-4 border-slate-950 rounded-xl shadow-2xl overflow-hidden">
+                    <div class="monitor-container">
+                        <iframe src="overlay2.html" class="pointer-events-none select-none"></iframe>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 p-5 rounded-xl shadow-2xl border border-slate-700">
+                <h2 class="text-lg font-bold text-amber-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    🏆 Top 10 Classificados
+                </h2>
+                <div class="overflow-hidden rounded-lg border border-slate-700 bg-slate-900/60 text-xs">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-slate-800 text-slate-400 uppercase font-black">
+                                <th class="p-2 text-center w-10">Pos</th>
+                                <th class="p-2">Trio</th>
+                                <th class="p-2 text-center w-16">Tempo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rankingPreviewBody">
+                            <tr>
+                                <td colspan="3" class="p-4 text-center text-slate-500 italic">Nenhum tempo registrado.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCm47PASBSXgnmGgUuDkFo7u7wOJ0x5Z4",
+            authDomain: "teanpening.firebaseapp.com",
+            databaseURL: "https://teanpening-default-rtdb.firebaseio.com",
+            projectId: "teanpening",
+            storageBucket: "teanpening.firebasestorage.app",
+            messagingSenderId: "914608543394",
+            appId: "1:914608543394:web:14d560e32c24282223a9fb"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let gcAtivoChave = null;
+        let gcAtivoStatus = "oculto";
+        let dadosLocais = null;
+
+        let visibilidadeSemi = false;
+        let visibilidadeFinal = false;
+
+        // Monitoramento da URL da Logo do Evento
+        database.ref('logo_evento_url').on('value', (snapshot) => {
+            const url = snapshot.val() || "";
+            document.getElementById('inputLogoUrl').value = url;
+        });
+
+        function salvarLogoUrl() {
+            const novaUrl = document.getElementById('inputLogoUrl').value.trim();
+            database.ref('logo_evento_url').set(novaUrl)
+                .then(() => alert("URL da Logo atualizada com sucesso!"))
+                .catch(err => alert("Erro ao salvar URL: " + err));
+        }
+
+        // Monitoramento de visibilidade das páginas
+        database.ref('visibilidade_semifinal').on('value', (snapshot) => {
+            visibilidadeSemi = snapshot.val() === true;
+            const btn = document.getElementById('btnToggleSemi');
+            if (visibilidadeSemi) {
+                btn.textContent = "Ocultar Semi Final";
+                btn.className = "bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded text-xs transition-colors shadow uppercase";
+            } else {
+                btn.textContent = "Exibir Semi Final";
+                btn.className = "bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded text-xs transition-colors shadow uppercase";
+            }
+        });
+
+        database.ref('visibilidade_final').on('value', (snapshot) => {
+            visibilidadeFinal = snapshot.val() === true;
+            const btn = document.getElementById('btnToggleFinal');
+            if (visibilidadeFinal) {
+                btn.textContent = "Ocultar Final";
+                btn.className = "bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded text-xs transition-colors shadow uppercase";
+            } else {
+                btn.textContent = "Exibir Final";
+                btn.className = "bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded text-xs transition-colors shadow uppercase";
+            }
+        });
+
+        function toggleSemi() {
+            database.ref('visibilidade_semifinal').set(!visibilidadeSemi);
+        }
+
+        function toggleFinal() {
+            database.ref('visibilidade_final').set(!visibilidadeFinal);
+        }
+
+        function colunaParaIndice(col) {
+            let num = 0;
+            col = col.toUpperCase().trim();
+            if (!col) return -1;
+            for (let i = 0; i < col.length; i++) {
+                num = col.charCodeAt(i) - 64 + num * 26;
+            }
+            return num - 1;
+        }
+
+        function processarPlanilha() {
+            const fileInput = document.getElementById('fileInput');
+            const colLetra1 = document.getElementById('inputColuna1').value;
+            const colLetra2 = document.getElementById('inputColuna2').value;
+            const colLetra3 = document.getElementById('inputColuna3').value;
+            const colLetraCat = document.getElementById('inputColunaCategoria').value;
+            const deLinha = parseInt(document.getElementById('linhaInicio').value);
+            const ateLinha = parseInt(document.getElementById('linhaFim').value);
+
+            if (!fileInput.files[0]) {
+                alert("Por favor, selecione um arquivo primeiro!");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const primeiraAba = workbook.Sheets[workbook.SheetNames[0]];
+                const matriz = XLSX.utils.sheet_to_json(primeiraAba, {header: 1});
+                
+                const idxCol1 = colunaParaIndice(colLetra1);
+                const idxCol2 = colunaParaIndice(colLetra2);
+                const idxCol3 = colunaParaIndice(colLetra3);
+                const idxColCat = colunaParaIndice(colLetraCat);
+
+                let dadosParaUpload = {};
+
+                for (let i = deLinha - 1; i < ateLinha; i++) {
+                    if (matriz[i]) {
+                        let nomesTrio = [];
+                        
+                        if (idxCol1 !== -1 && matriz[i][idxCol1] !== undefined) nomesTrio.push(matriz[i][idxCol1].toString().trim());
+                        if (idxCol2 !== -1 && matriz[i][idxCol2] !== undefined) nomesTrio.push(matriz[i][idxCol2].toString().trim());
+                        if (idxCol3 !== -1 && matriz[i][idxCol3] !== undefined) nomesTrio.push(matriz[i][idxCol3].toString().trim());
+                        
+                        nomesTrio = nomesTrio.filter(n => n !== "");
+
+                        let categoriaValor = "";
+                        if (idxColCat !== -1 && matriz[i][idxColCat] !== undefined) {
+                            categoriaValor = matriz[i][idxColCat].toString().trim();
+                        }
+
+                        if (nomesTrio.length > 0) {
+                            const linhaTextoCompleto = nomesTrio.join(", ");
+                            
+                            dadosParaUpload[`linha_${i + 1}`] = {
+                                texto: linhaTextoCompleto,
+                                categoria: categoriaValor,
+                                tempo: "",
+                                exibido: false,
+                                boi: ""
+                            };
+                        }
+                    }
+                }
+
+                database.ref('gc_atual_2').set({ texto: "", status: "oculto", chaveAtiva: "", boi: "", categoria: "", tempo: "" });
+
+                database.ref('lista_importada_2').remove()
+                    .then(() => {
+                        return database.ref('lista_importada_2').set(dadosParaUpload);
+                    })
+                    .then(() => alert("Dados importados com sucesso!"))
+                    .catch(err => alert("Erro ao processar dados: " + err));
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        database.ref('gc_atual_2').on('value', (snapshot) => {
+            const atual = snapshot.val();
+            if (atual) {
+                gcAtivoChave = atual.chaveAtiva || null;
+                gcAtivoStatus = atual.status || "oculto";
+            } else {
+                gcAtivoChave = null;
+                gcAtivoStatus = "oculto";
+            }
+            rederizarLista();
+        });
+
+        database.ref('lista_importada_2').on('value', (snapshot) => {
+            dadosLocais = snapshot.val();
+            rederizarLista();
+            rederizarRankingPreview();
+        });
+
+        function rederizarLista() {
+            const container = document.getElementById('listaContainer');
+            if (!dadosLocais) {
+                container.innerHTML = `<p class="text-slate-500 italic">Nenhum dado ativo no banco.</p>`;
+                return;
+            }
+
+            container.innerHTML = "";
+
+            const chavesOrdenadas = Object.keys(dadosLocais).sort((a, b) => {
+                return parseInt(a.replace('linha_', '')) - parseInt(b.replace('linha_', ''));
+            });
+
+            chavesOrdenadas.forEach((chave) => {
+                const item = dadosLocais[chave];
+                const boiAtual = item.boi || "";
+                const catAtual = item.categoria || "";
+                const tempoAtual = item.tempo || "";
+                
+                let cardCor = item.exibido ? 'bg-cyan-950/20 border-cyan-900/50' : 'bg-slate-700 border-slate-600';
+                let btnCor = 'bg-cyan-600 hover:bg-cyan-500 text-white';
+                let btnTexto = 'Enviar p/ Live';
+                let labelStatus = item.exibido ? '<span class="text-cyan-400 text-xs font-bold uppercase bg-cyan-950/60 px-2 py-1 rounded border border-cyan-800/40">Já correu</span>' : '';
+
+                const noAr = (gcAtivoChave === chave && gcAtivoStatus === "visivel");
+
+                if (noAr) {
+                    cardCor = 'bg-blue-950 border-blue-500 ring-2 ring-blue-500';
+                    btnCor = 'bg-red-600 hover:bg-red-500 text-white font-black animate-pulse';
+                    btnTexto = 'Ocultar da Live';
+                    labelStatus = '<span class="text-blue-400 text-xs font-bold uppercase bg-blue-900/50 px-2 py-1 rounded animate-pulse">No Ar</span>';
+                }
+
+                let botoesBoiHTML = '';
+                for (let n = 0; n <= 9; n++) {
+                    const ativo = boiAtual === n.toString();
+                    
+                    let btnClass = 'bg-slate-800 hover:bg-slate-600 text-slate-300';
+                    if (ativo) {
+                        btnClass = noAr 
+                            ? 'bg-red-600 text-white font-black scale-110 shadow-md ring-2 ring-red-400' 
+                            : 'bg-amber-500 text-slate-950 font-black';
+                    }
+
+                    botoesBoiHTML += `<button onclick="selecionarBoi('${chave}', '${n}')" class="w-8 h-8 text-sm rounded font-bold transition-all ${btnClass}">${n}</button>`;
+                }
+                
+                const btnLimparBoiClass = boiAtual === "" ? 'bg-slate-800 text-slate-500 line-through' : 'bg-red-950 text-red-400 border border-red-900';
+                botoesBoiHTML += `<button onclick="selecionarBoi('${chave}', '')" class="px-2 h-8 text-xs rounded font-medium transition-all ${btnLimparBoiClass}">Limpar</button>`;
+
+                const div = document.createElement('div');
+                div.className = `p-4 border rounded-lg flex flex-col gap-3 transition-all duration-300 ${cardCor}`;
+                
+                div.innerHTML = `
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div class="flex-1 space-y-2">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-xs text-slate-400 font-mono">${chave.toUpperCase()}</span>
+                                ${catAtual ? `<span class="text-xs font-extrabold uppercase bg-slate-800 text-amber-400 border border-slate-600 px-2 py-0.5 rounded">${catAtual}</span>` : ''}
+                                ${labelStatus}
+                            </div>
+                            <div class="flex gap-2">
+                                <input type="text" id="input-cat-${chave}" value="${catAtual}" placeholder="Categoria" class="w-1/5 bg-slate-850 text-amber-400 border border-slate-600 focus:border-blue-500 rounded px-2 py-1 text-sm font-bold uppercase">
+                                <input type="text" id="input-${chave}" value="${item.texto}" class="w-2/5 bg-slate-800 text-white border border-transparent focus:border-blue-500 rounded px-2 py-1 text-base font-semibold">
+                                <input type="text" id="input-tempo-${chave}" value="${tempoAtual}" placeholder="Tempo (Ex: 31.425)" class="w-2/5 bg-slate-900 text-emerald-400 border border-emerald-800/80 focus:border-emerald-400 rounded px-3 py-1 text-lg font-mono font-bold text-center">
+                            </div>
+                        </div>
+                        <div class="flex gap-2 items-center self-end md:self-center">
+                            <button onclick="salvarEdicao('${chave}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-3 py-2 rounded transition-colors h-11">
+                                Salvar
+                            </button>
+                            <button onclick="toggleLive('${chave}')" class="${btnCor} font-bold text-sm px-5 rounded transition-colors shadow h-11 min-w-[130px]">
+                                ${btnTexto}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-800">
+                        <span class="text-xs font-semibold text-slate-400 mr-2">Número do Boi:</span>
+                        ${botoesBoiHTML}
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function selecionarBoi(chave, numero) {
+            database.ref(`lista_importada_2/${chave}`).update({ boi: numero }).then(() => {
+                if (gcAtivoChave === chave && gcAtivoStatus === "visivel") {
+                    database.ref('gc_atual_2').update({ boi: numero });
+                }
+            });
+        }
+
+        function salvarEdicao(chave) {
+            const novoTexto = document.getElementById(`input-${chave}`).value;
+            const novaCategoria = document.getElementById(`input-cat-${chave}`).value;
+            const novoTempo = document.getElementById(`input-tempo-${chave}`).value.trim().replace(',', '.');
+            
+            database.ref(`lista_importada_2/${chave}`).update({ 
+                texto: novoTexto, 
+                categoria: novaCategoria,
+                tempo: novoTempo
+            })
+            .then(() => {
+                if (gcAtivoChave === chave && gcAtivoStatus === "visivel") {
+                    database.ref('gc_atual_2').update({ 
+                        texto: novoTexto,
+                        categoria: novaCategoria,
+                        tempo: novoTempo
+                    });
+                }
+                alert("Dados salvos com sucesso!");
+            });
+        }
+
+        function toggleLive(chave) {
+            const textoAtual = document.getElementById(`input-${chave}`).value;
+            const categoriaAtual = document.getElementById(`input-cat-${chave}`).value;
+            const tempoAtual = document.getElementById(`input-tempo-${chave}`).value.trim().replace(',', '.');
+            const boiAtual = dadosLocais[chave].boi || "";
+
+            if (gcAtivoChave === chave && gcAtivoStatus === "visivel") {
+                ocultarGC();
+            } else {
+                database.ref('gc_atual_2').set({
+                    texto: textoAtual,
+                    categoria: categoriaAtual,
+                    tempo: tempoAtual,
+                    status: "visivel",
+                    chaveAtiva: chave,
+                    boi: boiAtual
+                });
+                database.ref(`lista_importada_2/${chave}`).update({ exibido: true });
+            }
+        }
+
+        function ocultarGC() {
+            database.ref('gc_atual_2').update({ status: "oculto" });
+        }
+
+        function rederizarRankingPreview() {
+            const tbody = document.getElementById('rankingPreviewBody');
+            if (!dadosLocais) return;
+
+            let triosComTempo = [];
+            Object.keys(dadosLocais).forEach(key => {
+                const item = dadosLocais[key];
+                if (item.tempo && item.tempo.trim() !== "") {
+                    const numTempo = parseFloat(item.tempo);
+                    if (!isNaN(numTempo) && numTempo > 0) {
+                        triosComTempo.push({
+                            texto: item.texto,
+                            tempo: numTempo,
+                            tempoStr: item.tempo
+                        });
+                    }
+                }
+            });
+
+            triosComTempo.sort((a, b) => a.tempo - b.tempo);
+            const top10 = triosComTempo.slice(0, 10);
+
+            if (top10.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-500 italic">Nenhum tempo registrado.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = "";
+            top10.forEach((item, index) => {
+                tbody.innerHTML += `
+                    <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+                        <td class="p-2 text-center font-bold text-amber-400">${index + 1}º</td>
+                        <td class="p-2 font-semibold truncate max-w-[150px]">${item.texto}</td>
+                        <td class="p-2 text-center font-mono font-bold text-emerald-400">${item.tempoStr}s</td>
+                    </tr>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>

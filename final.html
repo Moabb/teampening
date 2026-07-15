@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classificação Oficial Top 10 - Final</title>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    
+    <style>
+        body {
+            background-color: transparent;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 0;
+            width: 1920px;
+            height: 1080px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Estrutura com transição de opacidade/visibilidade */
+        .ranking-container {
+            width: 1250px;
+            background-color: rgba(2, 6, 23, 0.96);
+            border: 2px solid rgba(6, 182, 212, 0.3);
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            overflow: visible;
+            backdrop-filter: blur(12px);
+            position: relative;
+            
+            /* Efeito de transição de exibição suave */
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        /* Classe que exibe o painel */
+        .ranking-container.active {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+
+        .cabecalho-placar {
+            background: linear-gradient(to right, #083344, #0f172a, #083344);
+            padding: 24px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(6, 182, 212, 0.3);
+            border-top-left-radius: 14px;
+            border-top-right-radius: 14px;
+        }
+
+        .titulo-principal {
+            font-size: 36px;
+            font-weight: 900;
+            color: #f8fafc;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .subtitulo {
+            color: #06b6d4;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-top: 4px;
+            margin-bottom: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .subtitulo-indicador {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #10b981;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        .container-logo-flutuante {
+            position: absolute;
+            top: -60px;
+            right: 40px;
+            width: 250px;
+            height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            transition: all 0.3s ease;
+        }
+
+        .logo-imagem {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0px 8px 16px rgba(0, 0, 0, 0.6));
+        }
+
+        .cabecalho-direita-vazio {
+            width: 270px; 
+        }
+
+        .tabela-corpo {
+            padding: 32px;
+        }
+
+        .tabela {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .tabela-header-th {
+            color: #94a3b8;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 12px;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.8);
+            padding-bottom: 12px;
+            text-align: center;
+        }
+
+        .th-alinhado-esquerda {
+            text-align: left;
+            padding-left: 24px;
+        }
+
+        .linha-resultado {
+            transition: background-color 0.2s;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.4);
+        }
+
+        .linha-resultado:hover {
+            background-color: rgba(15, 23, 42, 0.3);
+        }
+
+        .celula-posicao {
+            padding: 16px 0;
+            text-align: center;
+            font-weight: 800;
+            font-size: 20px;
+            color: #94a3b8;
+        }
+
+        .celula-competidores {
+            padding: 16px 0 16px 24px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #f1f5f9;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 500px;
+        }
+
+        .celula-categoria {
+            padding: 16px 0;
+            text-align: center;
+        }
+
+        .celula-boi {
+            padding: 16px 0;
+            text-align: center;
+        }
+
+        .celula-tempo {
+            padding: 16px 0;
+            text-align: center;
+        }
+
+        .badge-categoria {
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            background-color: #020617;
+            color: #06b6d4;
+            border: 1px solid #1e293b;
+            border-radius: 8px;
+        }
+
+        .badge-boi {
+            padding: 4px 16px;
+            font-size: 16px;
+            font-weight: 900;
+            border-radius: 6px;
+            border: 1px solid #1e293b;
+            background-color: #020617;
+            color: #f59e0b;
+        }
+
+        .tempo-texto {
+            font-family: monospace;
+            font-weight: 900;
+            font-size: 24px;
+            color: #10b981;
+        }
+
+        .primeiro-lugar {
+            background-color: rgba(120, 53, 4, 0.1);
+            border-left: 4px solid #f59e0b;
+            animation: gold-glow 2s infinite ease-in-out;
+        }
+        .primeiro-lugar:hover {
+            background-color: rgba(120, 53, 4, 0.2);
+        }
+        .primeiro-lugar .celula-posicao {
+            color: #f59e0b;
+            font-size: 28px;
+        }
+        .primeiro-lugar .tempo-texto {
+            color: #f59e0b;
+        }
+        .primeiro-lugar .badge-boi {
+            background-color: rgba(120, 53, 4, 0.4);
+            color: #f59e0b;
+            border-color: rgba(245, 158, 11, 0.4);
+        }
+
+        .segundo-lugar {
+            background-color: rgba(15, 23, 42, 0.2);
+            border-left: 4px solid #94a3b8;
+        }
+        .segundo-lugar:hover {
+            background-color: rgba(15, 23, 42, 0.4);
+        }
+        .segundo-lugar .celula-posicao {
+            color: #e2e8f0;
+            font-size: 24px;
+        }
+        .segundo-lugar .badge-boi {
+            background-color: #020617;
+            color: #cbd5e1;
+            border-color: rgba(148, 163, 184, 0.4);
+        }
+
+        .terceiro-lugar {
+            background-color: rgba(120, 53, 4, 0.05);
+            border-left: 4px solid #b45309;
+        }
+        .terceiro-lugar:hover {
+            background-color: rgba(120, 53, 4, 0.1);
+        }
+        .terceiro-lugar .celula-posicao {
+            color: #b45309;
+            font-size: 24px;
+        }
+        .terceiro-lugar .badge-boi {
+            background-color: rgba(120, 53, 4, 0.2);
+            color: #b45309;
+            border-color: rgba(180, 83, 9, 0.4);
+        }
+
+        .rodape-placar {
+            background-color: rgba(15, 23, 42, 0.4);
+            padding: 12px 40px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            border-top: 1px solid rgba(2, 6, 23, 0.6);
+            border-bottom-left-radius: 14px;
+            border-bottom-right-radius: 14px;
+        }
+
+        @keyframes gold-glow {
+            0%, 100% { border-left-color: rgba(245, 158, 11, 0.4); }
+            50% { border-left-color: rgba(245, 158, 11, 1); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+
+        .tabela-vazia {
+            padding: 80px 0;
+            text-align: center;
+            color: #64748b;
+            font-style: italic;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="painelRanking" class="ranking-container">
+        
+        <div id="wrapperLogo" class="container-logo-flutuante" style="display: none;">
+            <img id="logoImg" src="" alt="Logo Oficial" class="logo-imagem">
+        </div>
+        
+        <div class="cabecalho-placar">
+            <div>
+                <h1 class="titulo-principal">FINAL</h1>
+                <p class="subtitulo">
+                    <span class="subtitulo-indicador"></span>
+                    RANKING TOP 10 • MENORES TEMPOS
+                </p>
+            </div>
+            <div id="espacoLogoDireita" class="cabecalho-direita-vazio" style="display: none;"></div>
+        </div>
+
+        <div class="tabela-corpo">
+            <table class="tabela">
+                <thead>
+                    <tr>
+                        <th class="tabela-header-th" style="width: 80px;">POS</th>
+                        <th class="tabela-header-th th-alinhado-esquerda">TRIO DE COMPETIDORES</th>
+                        <th class="tabela-header-th" style="width: 190px;">CATEGORIA</th>
+                        <th class="tabela-header-th" style="width: 130px;">BOI</th>
+                        <th class="tabela-header-th" style="width: 160px;">TEMPO REGISTRADO</th>
+                    </tr>
+                </thead>
+                <tbody id="rankingBody">
+                    <tr>
+                        <td colspan="5" class="tabela-vazia">
+                            Aguardando o registro dos primeiros tempos de pista...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="rodape-placar">
+            Resultados Atualizados Instantaneamente via Cronômetro Oficial
+        </div>
+
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCm47PASBSXgnmGgUuDkFo7u7wOJ0x5Z4",
+            authDomain: "teanpening.firebaseapp.com",
+            databaseURL: "https://teanpening-default-rtdb.firebaseio.com",
+            projectId: "teanpening",
+            storageBucket: "teanpening.firebasestorage.app",
+            messagingSenderId: "914608543394",
+            appId: "1:914608543394:web:14d560e32c24282223a9fb"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Escuta o comando de visibilidade da Final
+        database.ref('visibilidade_final').on('value', (snapshot) => {
+            const visivel = snapshot.val() === true;
+            const painel = document.getElementById('painelRanking');
+            if (visivel) {
+                painel.classList.add('active');
+            } else {
+                painel.classList.remove('active');
+            }
+        });
+
+        database.ref('logo_evento_url').on('value', (snapshot) => {
+            const url = snapshot.val();
+            const wrapperLogo = document.getElementById('wrapperLogo');
+            const logoImg = document.getElementById('logoImg');
+            const espacoLogoDireita = document.getElementById('espacoLogoDireita');
+
+            if (url && url.trim() !== "") {
+                logoImg.src = url;
+                wrapperLogo.style.display = "flex";
+                espacoLogoDireita.style.display = "block";
+            } else {
+                wrapperLogo.style.display = "none";
+                espacoLogoDireita.style.display = "none";
+            }
+        });
+
+        database.ref('lista_importada_2').on('value', (snapshot) => {
+            const dados = snapshot.val();
+            const tbody = document.getElementById('rankingBody');
+
+            if (!dados) {
+                tbody.innerHTML = `<tr><td colspan="5" class="tabela-vazia">Nenhum competidor importado no sistema.</td></tr>`;
+                return;
+            }
+
+            let classificados = [];
+            
+            Object.keys(dados).forEach(key => {
+                const item = dados[key];
+                if (item.tempo && item.tempo.trim() !== "") {
+                    const numTempo = parseFloat(item.tempo);
+                    if (!isNaN(numTempo) && numTempo > 0) {
+                        classificados.push({
+                            texto: item.texto,
+                            categoria: item.categoria || "---",
+                            boi: item.boi !== undefined && item.boi !== "" ? item.boi : "--",
+                            tempo: numTempo,
+                            tempoOriginal: item.tempo
+                        });
+                    }
+                }
+            });
+
+            classificados.sort((a, b) => a.tempo - b.tempo);
+            const top10 = classificados.slice(0, 10);
+
+            if (top10.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="tabela-vazia">Nenhum tempo válido registrado até o momento.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = "";
+            top10.forEach((item, index) => {
+                let medalhaHTML = "";
+                let classePodio = "";
+
+                if (index === 0) {
+                    classePodio = "primeiro-lugar";
+                    medalhaHTML = "🥇";
+                } else if (index === 1) {
+                    classePodio = "segundo-lugar";
+                    medalhaHTML = "🥈";
+                } else if (index === 2) {
+                    classePodio = "terceiro-lugar";
+                    medalhaHTML = "🥉";
+                }
+
+                tbody.innerHTML += `
+                    <tr class="linha-resultado ${classePodio}">
+                        <td class="celula-posicao">
+                            ${medalhaHTML ? `<span style="margin-right: 4px;">${medalhaHTML}</span>` : ""} ${index + 1}º
+                        </td>
+                        <td class="celula-competidores">
+                            ${item.texto}
+                        </td>
+                        <td class="celula-categoria">
+                            <span class="badge-categoria">
+                                ${item.categoria}
+                            </span>
+                        </td>
+                        <td class="celula-boi">
+                            <span class="badge-boi">
+                                ${item.boi}
+                            </span>
+                        </td>
+                        <td class="celula-tempo">
+                            <span class="tempo-texto">${item.tempoOriginal}s</span>
+                        </td>
+                    </tr>
+                `;
+            });
+        });
+    </script>
+</body>
+</html>
