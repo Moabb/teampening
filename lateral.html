@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classificação Oficial Top 10 - Lateral</title>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    
+    <style>
+        body {
+            background-color: transparent;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            width: 1920px;
+            height: 1080px;
+            display: flex;
+            align-items: flex-start; /* Alinha no topo */
+            justify-content: flex-start; /* Alinha na esquerda (mude para flex-end se preferir no canto direito) */
+        }
+
+        /* Estrutura compacta ideal para lateral */
+        .ranking-container {
+            width: 480px; /* Largura reduzida para caber no canto */
+            background-color: rgba(2, 6, 23, 0.671);
+            border: 2px solid rgba(6, 182, 212, 0.3);
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            backdrop-filter: blur(12px);
+            position: relative;
+            
+            /* Efeito de transição de exibição suave */
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        /* Classe que exibe o painel */
+        .ranking-container.active {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+
+        .cabecalho-placar {
+            background: linear-gradient(to right, #0833447d, #0f172a82, #08334482);
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(6, 182, 212, 0.3);
+        }
+
+        .titulo-principal {
+            font-size: 20px;
+            font-weight: 900;
+            color: #f8fafc;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        .tabela-corpo {
+            padding: 12px;
+        }
+
+        .tabela {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .tabela-header-th {
+            color: #94a3b8;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 11px;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.8);
+            padding-bottom: 8px;
+            text-align: center;
+        }
+
+        .th-alinhado-esquerda {
+            text-align: left;
+            padding-left: 12px;
+        }
+
+        .linha-resultado {
+            transition: background-color 0.2s;
+            border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+        }
+
+        .linha-resultado:hover {
+            background-color: rgba(15, 23, 42, 0.3);
+        }
+
+        .celula-posicao {
+            padding: 10px 0;
+            text-align: center;
+            font-weight: 800;
+            font-size: 15px;
+            color: #94a3b8;
+        }
+
+        .celula-competidores {
+            padding: 10px 0 10px 12px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #f1f5f9;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 250px; /* Impede que nomes gigantes quebrem o layout */
+        }
+
+        .celula-tempo {
+            padding: 10px 0;
+            text-align: right;
+            padding-right: 12px;
+        }
+
+        .tempo-texto {
+            font-family: monospace;
+            font-weight: 900;
+            font-size: 16px;
+            color: #10b981;
+        }
+
+        /* Destaques do Pódio de forma mais discreta para o painel lateral */
+        .primeiro-lugar {
+            background-color: rgba(245, 158, 11, 0.05);
+            border-left: 3px solid #f59e0b;
+        }
+        .primeiro-lugar .celula-posicao {
+            color: #f59e0b;
+        }
+        .primeiro-lugar .tempo-texto {
+            color: #f59e0b;
+        }
+
+        .segundo-lugar {
+            background-color: rgba(148, 163, 184, 0.03);
+            border-left: 3px solid #94a3b8;
+        }
+        .segundo-lugar .celula-posicao {
+            color: #e2e8f0;
+        }
+
+        .terceiro-lugar {
+            background-color: rgba(180, 83, 9, 0.03);
+            border-left: 3px solid #b45309;
+        }
+        .terceiro-lugar .celula-posicao {
+            color: #b45309;
+        }
+
+        .tabela-vazia {
+            padding: 40px 0;
+            text-align: center;
+            color: #64748b;
+            font-style: italic;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="painelRanking" class="ranking-container">
+        
+        <div class="cabecalho-placar">
+            <h1 id="tituloPagina" class="titulo-principal">CLASSIFICAÇÃO FINAL</h1>
+        </div>
+
+        <div class="tabela-corpo">
+            <table class="tabela">
+                <thead>
+                    <tr>
+                        <th class="tabela-header-th" style="width: 50px;">POS</th>
+                        <th class="tabela-header-th th-alinhado-esquerda">COMPETIDORES</th>
+                        <th class="tabela-header-th" style="width: 100px; text-align: right; padding-right: 12px;">TEMPO</th>
+                    </tr>
+                </thead>
+                <tbody id="rankingBody">
+                    <tr>
+                        <td colspan="3" class="tabela-vazia">
+                            Aguardando tempos...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCm47PASBSXgnmGgUuDkFo7u7wOJ0x5Z4",
+            authDomain: "teanpening.firebaseapp.com",
+            databaseURL: "https://teanpening-default-rtdb.firebaseio.com",
+            projectId: "teanpening",
+            storageBucket: "teanpening.firebasestorage.app",
+            messagingSenderId: "914608543394",
+            appId: "1:914608543394:web:14d560e32c24282223a9fb"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Escuta a alteração dinâmica do TÍTULO
+        database.ref('titulo_final').on('value', (snapshot) => {
+            const titulo = snapshot.val();
+            const elTitulo = document.getElementById('tituloPagina');
+            if (titulo && titulo.trim() !== "") {
+                elTitulo.innerText = titulo;
+            } else {
+                elTitulo.innerText = "CLASSIFICAÇÃO FINAL";
+            }
+        });
+
+        // Escuta o comando de visibilidade
+        database.ref('visibilidade_final').on('value', (snapshot) => {
+            const visivel = snapshot.val() === true;
+            const painel = document.getElementById('painelRanking');
+            if (visivel) {
+                painel.classList.add('active');
+            } else {
+                painel.classList.remove('active');
+            }
+        });
+
+        // Escuta e monta a lista dinâmica
+        database.ref('lista_importada_2').on('value', (snapshot) => {
+            const dados = snapshot.val();
+            const tbody = document.getElementById('rankingBody');
+
+            if (!dados) {
+                tbody.innerHTML = `<tr><td colspan="3" class="tabela-vazia">Nenhum competidor importado.</td></tr>`;
+                return;
+            }
+
+            let classificados = [];
+            
+            Object.keys(dados).forEach(key => {
+                const item = dados[key];
+                if (item.tempo && item.tempo.trim() !== "") {
+                    const numTempo = parseFloat(item.tempo);
+                    if (!isNaN(numTempo) && numTempo > 0) {
+                        classificados.push({
+                            texto: item.texto,
+                            tempo: numTempo,
+                            tempoOriginal: item.tempo
+                        });
+                    }
+                }
+            });
+
+            classificados.sort((a, b) => a.tempo - b.tempo);
+            const top10 = classificados.slice(0, 10);
+
+            if (top10.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="tabela-vazia">Nenhum tempo válido.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = "";
+            top10.forEach((item, index) => {
+                let medalhaHTML = "";
+                let classePodio = "";
+
+                if (index === 0) {
+                    classePodio = "primeiro-lugar";
+                    medalhaHTML = "🥇";
+                } else if (index === 1) {
+                    classePodio = "segundo-lugar";
+                    medalhaHTML = "🥈";
+                } else if (index === 2) {
+                    classePodio = "terceiro-lugar";
+                    medalhaHTML = "🥉";
+                }
+
+                tbody.innerHTML += `
+                    <tr class="linha-resultado ${classePodio}">
+                        <td class="celula-posicao">
+                            ${medalhaHTML ? `<span style="margin-right: 2px;">${medalhaHTML}</span>` : ""} ${index + 1}º
+                        </td>
+                        <td class="celula-competidores">
+                            ${item.texto}
+                        </td>
+                        <td class="celula-tempo">
+                            <span class="tempo-texto">${item.tempoOriginal}s</span>
+                        </td>
+                    </tr>
+                `;
+            });
+        });
+    </script>
+</body>
+</html>
